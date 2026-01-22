@@ -3,6 +3,8 @@ package config
 import (
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -34,6 +36,11 @@ func validateConfig(cfg *Config) {
 }
 
 func LoadConfig() *Config {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found, using system environment variables")
+	}
+
 	cfg := &Config{
 		ServerPort: os.Getenv("SERVER_PORT"),
 		DBName:     os.Getenv("DB_NAME"),

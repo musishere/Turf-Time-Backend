@@ -34,3 +34,12 @@ func (r *LocationRepository) UpdateLocation(location *models.Location) error {
 func (r *LocationRepository) DeleteLocation(id string) error {
 	return r.db.Delete(&models.Location{}, "id = ?", id).Error
 }
+
+func (r *LocationRepository) GetLocationByUserID(userID string) (*models.Location, error) {
+	var location models.Location
+	err := r.db.Where("user_id = ?", userID).First(&location).Error
+	if err != nil {
+		return nil, err
+	}
+	return &location, nil
+}

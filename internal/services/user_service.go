@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,44 +81,32 @@ func (s *UserService) Register(name, email, password string, latitude, longitude
 
 func (s *UserService) Login(email, password string, latitude, longitude float64) (*models.User, string, error) {
 	user, err := s.userRepo.GetUserByEmail(email)
-	if err != nil || user == nil {
-		return nil, "", errors.New("invalid credentials")
+	if err != nil {
+		return nil, "", err
 	}
 
 	if err := auth.VerifyPassword(user.Password, password); err != nil {
-		return nil, "", errors.New("invalid credentials")
-	}
-
-	if latitude != 0 && longitude != 0 {
-		existingLocation, err := s.locationRepo.GetLocationByUserID(user.ID.String())
-		if err != nil {
-			location := &models.Location{
-				ID:        uuid.New().String(),
-				UserID:    user.ID.String(),
-				Latitude:  latitude,
-				Longitude: longitude,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-			}
-			if err := s.locationRepo.CreateLocation(location); err != nil {
-				fmt.Printf("Failed to create location: %v\n", err)
-				return nil, "", err
-			}
-		} else {
-			existingLocation.Latitude = latitude
-			existingLocation.Longitude = longitude
-			existingLocation.UpdatedAt = time.Now()
-			if err := s.locationRepo.UpdateLocation(existingLocation); err != nil {
-				fmt.Printf("Failed to update location: %v\n", err)
-				return nil, "", err
-			}
-		}
+		return nil, "", err
 	}
 
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
 	if err != nil {
 		return nil, "", err
 	}
+
+	location, err := s.locationRepo.GetLocationByUserID(user.ID.String())
+	if err != nil {
+		return nil, "", err
+	}
+
+	location.Latitude = latitude
+	location.Longitude = longitude
+
+	if err := s.locationRepo.UpdateLocation(location); err != nil {
+		return nil, "", err
+	}
+
+	user.Location = *location
 
 	return user, token, nil
 }

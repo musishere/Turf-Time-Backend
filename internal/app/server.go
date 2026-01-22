@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/musishere/sportsApp/config"
 	"github.com/musishere/sportsApp/internal/database"
+	"github.com/musishere/sportsApp/internal/handlers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/services"
@@ -44,7 +45,6 @@ func SetupRoutes(
 ) {
 	api := router.Group("/api")
 
-	// User routes
-	api.POST("/signup", nil)
-	api.POST("/login", nil)
+	api.POST("/signup", handlers.NewUserHandler(userService).RegisterUser)
+	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
 }

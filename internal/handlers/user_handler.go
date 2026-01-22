@@ -74,6 +74,8 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 
 	}
 
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
+
 	c.JSON(http.StatusCreated, RegisterResponse{
 		User:  user,
 		Token: token,
@@ -95,7 +97,7 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid username or password"})
 		return
 	}
-
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, LoginResponse{
 		User:  user,
 		Token: token,

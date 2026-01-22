@@ -43,8 +43,9 @@ func SetupRoutes(
 	locationService *services.LocationService,
 	jwtSecret string,
 ) {
-	api := router.Group("/api")
+	api := router.Group("/api/v1")
 
 	api.POST("/signup", handlers.NewUserHandler(userService).RegisterUser)
 	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
+	api.GET("/get-currentUser", handlers.NewUserHandler(userService).GetCurrentUser)
 }

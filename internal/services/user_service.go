@@ -71,6 +71,8 @@ func (s *UserService) Register(name, email, password string, latitude, longitude
 		return nil, "", err
 	}
 
+	user.Location = *location
+
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
 	if err != nil {
 		return nil, "", err
@@ -109,4 +111,24 @@ func (s *UserService) Login(email, password string, latitude, longitude float64)
 	user.Location = *location
 
 	return user, token, nil
+}
+
+func (s *UserService) GetByID(id string) (*models.User, error) {
+	if id == "" {
+		return nil, errors.New("Please provide an ID")
+	}
+
+	user, err := s.userRepo.GetUserByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	location, err := s.locationRepo.GetLocationByUserID(user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	user.Location = *location
+
+	return user, nil
 }

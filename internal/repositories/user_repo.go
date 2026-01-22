@@ -23,6 +23,7 @@ func (r *UserRepository) GetUserByID(id string) (*models.User, error) {
 	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
+
 	return &user, nil
 }
 

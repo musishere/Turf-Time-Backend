@@ -1,3 +1,10 @@
+package repositories
+
+import (
+	"github.com/musishere/sportsApp/internal/models"
+	"gorm.io/gorm"
+)
+
 type LocationRepository struct {
 	db *gorm.DB
 }

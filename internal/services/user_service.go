@@ -28,7 +28,7 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) Register(name, email, password string, latitude, longitude float64) (*models.User, string, error) {
+func (s *UserService) Register(name, email, password, gender, phone, cnic string, latitude, longitude float64) (*models.User, string, error) {
 	if name == "" || email == "" || password == "" {
 		return nil, "", errors.New("name, email, and password are required")
 	}
@@ -43,13 +43,21 @@ func (s *UserService) Register(name, email, password string, latitude, longitude
 		return nil, "", err
 	}
 
+	cnicNumber, err := auth.HashedCnic(cnic)
+	if err != nil {
+		return nil, "", err
+	}
+
 	user := &models.User{
 		ID:        uuid.New(),
 		Name:      name,
 		Email:     email,
 		Password:  hashedPassword,
+		Phone:     phone,
+		Gender:    gender,
 		Role:      "player",
 		IsActive:  true,
+		Cnic:      cnicNumber,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

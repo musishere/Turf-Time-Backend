@@ -25,6 +25,9 @@ type RegisterRequest struct {
 	Password  string  `json:"password" binding:"required,min=6"`
 	Latitude  float64 `json:"latitude" binding:"required"`
 	Longitude float64 `json:"longitude" binding:"required"`
+	Cnic      string  `json:"cnic" binding:"required"`
+	Phone     string  `json:"phone" required:"true"`
+	Gender    string  `json:"gender" required:"true"`
 }
 
 type CurrentUserResponse struct {
@@ -62,6 +65,9 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		req.Name,
 		req.Email,
 		req.Password,
+		req.Gender,
+		req.Phone,
+		req.Cnic,
 		req.Latitude,
 		req.Longitude,
 	)

@@ -117,6 +117,13 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 
 }
 
+func (h *UserHandler) LogOutUser(c *gin.Context) {
+	c.SetCookie("Jwt-Token", "", -1, "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User logged out",
+	})
+}
+
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	tokernString, err := c.Cookie("Jwt-Token")

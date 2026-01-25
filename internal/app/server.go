@@ -45,7 +45,9 @@ func SetupRoutes(
 ) {
 	api := router.Group("/api/v1")
 
+	//User Routes
 	api.POST("/signup", handlers.NewUserHandler(userService).RegisterUser)
 	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
 	api.GET("/get-currentUser", handlers.NewUserHandler(userService).GetCurrentUser)
+	api.POST("/logout", handlers.NewUserHandler(userService).LogOutUser)
 }

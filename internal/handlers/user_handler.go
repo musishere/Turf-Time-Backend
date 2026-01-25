@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/musishere/sportsApp/config"
+	"github.com/musishere/sportsApp/internal/auth"
 	"github.com/musishere/sportsApp/internal/services"
 )
 
@@ -23,6 +25,13 @@ type RegisterRequest struct {
 	Password  string  `json:"password" binding:"required,min=6"`
 	Latitude  float64 `json:"latitude" binding:"required"`
 	Longitude float64 `json:"longitude" binding:"required"`
+	Cnic      string  `json:"cnic" binding:"required"`
+	Phone     string  `json:"phone" required:"true"`
+	Gender    string  `json:"gender" required:"true"`
+}
+
+type CurrentUserResponse struct {
+	User interface{} `json:"user"`
 }
 
 type RegisterResponse struct {
@@ -56,6 +65,9 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		req.Name,
 		req.Email,
 		req.Password,
+		req.Gender,
+		req.Phone,
+		req.Cnic,
 		req.Latitude,
 		req.Longitude,
 	)
@@ -73,6 +85,8 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		})
 
 	}
+
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 
 	c.JSON(http.StatusCreated, RegisterResponse{
 		User:  user,
@@ -95,10 +109,43 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid username or password"})
 		return
 	}
-
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, LoginResponse{
 		User:  user,
 		Token: token,
 	})
+
+}
+
+func (h *UserHandler) LogOutUser(c *gin.Context) {
+	c.SetCookie("Jwt-Token", "", -1, "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User logged out",
+	})
+}
+
+func (h *UserHandler) GetCurrentUser(c *gin.Context) {
+
+	tokernString, err := c.Cookie("Jwt-Token")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, "No Token recieved")
+		return
+	}
+
+	secret := config.LoadConfig()
+
+	existingUser, err := auth.VerifyJWT(tokernString, secret.JWTSecret)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "Invalid Token")
+		return
+	}
+
+	user, err := h.userService.GetByID(existingUser.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
 
 }

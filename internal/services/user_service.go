@@ -28,7 +28,7 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) Register(name, email, password string, latitude, longitude float64) (*models.User, string, error) {
+func (s *UserService) Register(name, email, password, gender, phone, cnic string, latitude, longitude float64) (*models.User, string, error) {
 	if name == "" || email == "" || password == "" {
 		return nil, "", errors.New("name, email, and password are required")
 	}
@@ -43,13 +43,21 @@ func (s *UserService) Register(name, email, password string, latitude, longitude
 		return nil, "", err
 	}
 
+	cnicNumber, err := auth.HashedCnic(cnic)
+	if err != nil {
+		return nil, "", err
+	}
+
 	user := &models.User{
 		ID:        uuid.New(),
 		Name:      name,
 		Email:     email,
 		Password:  hashedPassword,
+		Phone:     phone,
+		Gender:    gender,
 		Role:      "player",
 		IsActive:  true,
+		Cnic:      cnicNumber,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -70,6 +78,8 @@ func (s *UserService) Register(name, email, password string, latitude, longitude
 	if err := s.locationRepo.CreateLocation(location); err != nil {
 		return nil, "", err
 	}
+
+	user.Location = *location
 
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
 	if err != nil {
@@ -109,4 +119,24 @@ func (s *UserService) Login(email, password string, latitude, longitude float64)
 	user.Location = *location
 
 	return user, token, nil
+}
+
+func (s *UserService) GetByID(id string) (*models.User, error) {
+	if id == "" {
+		return nil, errors.New("Please provide an ID")
+	}
+
+	user, err := s.userRepo.GetUserByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	location, err := s.locationRepo.GetLocationByUserID(user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	user.Location = *location
+
+	return user, nil
 }

@@ -23,13 +23,15 @@ func StartServer() {
 
 	userRepo := repositories.NewUserRepository(db)
 	locationRepo := repositories.NewLocationRepository(db)
+	sportsRepo := repositories.NewSportsRepositry(db)
 
 	userService := services.NewUserService(userRepo, locationRepo, cfg.JWTSecret)
 	locationService := services.NewLocationService(locationRepo)
+	sportsService := services.NewSportsService(sportsRepo)
 
 	router := gin.Default()
 
-	SetupRoutes(router, userService, locationService, cfg.JWTSecret)
+	SetupRoutes(router, userService, locationService, sportsService, cfg.JWTSecret)
 
 	log.Printf("Server running on port %s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
@@ -41,6 +43,7 @@ func SetupRoutes(
 	router *gin.Engine,
 	userService *services.UserService,
 	locationService *services.LocationService,
+	sportsService *services.SportsService,
 	jwtSecret string,
 ) {
 	api := router.Group("/api/v1")
@@ -50,4 +53,7 @@ func SetupRoutes(
 	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
 	api.GET("/get-currentUser", handlers.NewUserHandler(userService).GetCurrentUser)
 	api.POST("/logout", handlers.NewUserHandler(userService).LogOutUser)
+
+	// sports Routes
+	api.POST("/sports", handlers.NewSportsHandler(sportsService).RegisterNewSports)
 }

@@ -59,6 +59,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 			"error":   "Invalid request data",
 			"details": err.Error(),
 		})
+		return
 	}
 
 	user, token, err := h.userService.Register(

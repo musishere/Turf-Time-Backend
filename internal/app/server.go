@@ -17,7 +17,7 @@ func StartServer() {
 
 	db := database.ConnectDatabase(cfg)
 
-	if err := db.AutoMigrate(&models.User{}, &models.Location{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Location{}, &models.Sports{}); err != nil {
 		log.Fatal("Database migration failed:", err)
 	}
 

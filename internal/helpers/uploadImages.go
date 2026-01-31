@@ -12,6 +12,7 @@ import (
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/cloudinary/cloudinary-go/v2/config"
 )
 
 // ImageUploader handles image uploads to Cloudinary
@@ -30,7 +31,15 @@ func NewImageUploader() (*ImageUploader, error) {
 		return nil, fmt.Errorf("cloudinary credentials not configured")
 	}
 
-	cld, err := cloudinary.NewFromParams(cloudName, apiKey, apiSecret)
+	cfg, err := config.NewFromParams(cloudName, apiKey, apiSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init cloudinary config: %w", err)
+	}
+	// SDK default timeout is 60s; use 120s for slow networks / large uploads
+	cfg.API.Timeout = 120
+	cfg.API.UploadTimeout = 120
+
+	cld, err := cloudinary.NewFromConfiguration(*cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init cloudinary: %w", err)
 	}

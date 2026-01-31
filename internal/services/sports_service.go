@@ -37,8 +37,8 @@ func (s *SportsService) CreateNewSport(
 		return nil, err
 	}
 
-	// Upload bytes instead of FileHeader
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second) // shorter timeout
+	// Upload bytes instead of FileHeader (long timeout for slow networks / Cloudinary)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	// Use UploadFromBytes instead (see below)

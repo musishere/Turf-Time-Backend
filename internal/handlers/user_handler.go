@@ -59,6 +59,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 			"error":   "Invalid request data",
 			"details": err.Error(),
 		})
+		return
 	}
 
 	user, token, err := h.userService.Register(
@@ -115,6 +116,13 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		Token: token,
 	})
 
+}
+
+func (h *UserHandler) LogOutUser(c *gin.Context) {
+	c.SetCookie("Jwt-Token", "", -1, "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User logged out",
+	})
 }
 
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {

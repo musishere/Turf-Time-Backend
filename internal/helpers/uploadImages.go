@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,109 +17,151 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2/config"
 )
 
-// ImageUploader handles image uploads to Cloudinary
+const maxFileSize = 5 * 1024 * 1024 // 5MB
+
+var (
+	allowedImageExts = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+	safePublicIDRe   = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
+)
+
 type ImageUploader struct {
 	cld           *cloudinary.Cloudinary
+	cloudName     string
 	defaultFolder string
 }
 
-// NewImageUploader initializes the uploader from environment variables
 func NewImageUploader() (*ImageUploader, error) {
 	cloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
 	apiKey := os.Getenv("CLOUDINARY_API_KEY")
 	apiSecret := os.Getenv("CLOUDINARY_API_SECRET")
-
 	if cloudName == "" || apiKey == "" || apiSecret == "" {
 		return nil, fmt.Errorf("cloudinary credentials not configured")
 	}
 
 	cfg, err := config.NewFromParams(cloudName, apiKey, apiSecret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init cloudinary config: %w", err)
+		return nil, fmt.Errorf("cloudinary config: %w", err)
 	}
-	// SDK default timeout is 60s; use 120s for slow networks / large uploads
 	cfg.API.Timeout = 120
 	cfg.API.UploadTimeout = 120
 
 	cld, err := cloudinary.NewFromConfiguration(*cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init cloudinary: %w", err)
+		return nil, fmt.Errorf("cloudinary init: %w", err)
 	}
 
 	return &ImageUploader{
 		cld:           cld,
-		defaultFolder: "sports_images", // default folder
+		cloudName:     cloudName,
+		defaultFolder: "sports_images",
 	}, nil
 }
 
-// UploadImage takes a multipart file and returns the Cloudinary URL
+func sanitizePublicID(name string) string {
+	s := strings.TrimSpace(name)
+	s = strings.ReplaceAll(s, " ", "_")
+	s = safePublicIDRe.ReplaceAllString(s, "_")
+	s = strings.Trim(s, "_")
+	if s == "" {
+		return "image"
+	}
+	return s
+}
+
+func (u *ImageUploader) makePublicID(filename string) string {
+	base := sanitizePublicID(strings.TrimSuffix(filename, filepath.Ext(filename)))
+	return fmt.Sprintf("%s_%d", base, time.Now().Unix())
+}
+
+// urlFromResult returns the secure URL from an upload result, or an error.
+func (u *ImageUploader) urlFromResult(result *uploader.UploadResult) (string, error) {
+	if result == nil {
+		return "", fmt.Errorf("cloudinary returned empty response")
+	}
+	if result.Error.Message != "" {
+		return "", fmt.Errorf("cloudinary: %s", result.Error.Message)
+	}
+
+	url := result.SecureURL
+	if url == "" && result.PublicID != "" {
+		rt := result.ResourceType
+		if rt == "" {
+			rt = "image"
+		}
+		format := result.Format
+		if format == "" {
+			format = "jpg"
+		}
+		url = fmt.Sprintf("https://res.cloudinary.com/%s/%s/upload/v%d/%s.%s",
+			u.cloudName, rt, result.Version, result.PublicID, format)
+	}
+	if url == "" {
+		return "", fmt.Errorf("cloudinary returned no URL")
+	}
+	return url, nil
+}
+
+func (u *ImageUploader) upload(ctx context.Context, reader interface{}, folder, publicID, transformation string) (string, error) {
+	result, err := u.cld.Upload.Upload(ctx, reader, uploader.UploadParams{
+		Folder:         folder,
+		PublicID:       publicID,
+		ResourceType:   "image",
+		Transformation: transformation,
+	})
+	if err != nil {
+		return "", fmt.Errorf("cloudinary: %w", err)
+	}
+	return u.urlFromResult(result)
+}
+
 func (u *ImageUploader) UploadImage(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
-	// Validation 1: Check file size (max 5MB)
-	if fileHeader.Size > 5*1024*1024 {
+	if fileHeader.Size > maxFileSize {
 		return "", fmt.Errorf("file too large: max 5MB allowed")
 	}
-
-	// Validation 2: Check file extension
 	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
-	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
-	if !allowedExts[ext] {
-		return "", fmt.Errorf("invalid file type: %s, allowed: jpg, jpeg, png, webp", ext)
+	if !allowedImageExts[ext] {
+		return "", fmt.Errorf("icon must be an image (jpg, jpeg, png, webp); got %s", ext)
 	}
 
-	// Open file
 	file, err := fileHeader.Open()
 	if err != nil {
 		return "", fmt.Errorf("cannot open file: %w", err)
 	}
 	defer file.Close()
 
-	// Generate unique public ID (filename without ext + timestamp)
-	fileName := strings.TrimSuffix(fileHeader.Filename, ext)
-	timestamp := time.Now().Unix()
-	publicID := fmt.Sprintf("%s_%d", fileName, timestamp)
-
-	// Upload parameters
-	uploadParams := uploader.UploadParams{
-		Folder:       u.defaultFolder,
-		PublicID:     publicID,
-		ResourceType: "image",
-		// Overwrite:      false,                  // Prevent accidental overwrites
-		Transformation: "q_auto,f_auto,w_1000", // Auto-optimize quality, format, max width 1000px
-	}
-
-	// Execute upload with context (respects timeout/cancellation)
-	result, err := u.cld.Upload.Upload(ctx, file, uploadParams)
+	publicID := u.makePublicID(fileHeader.Filename)
+	url, err := u.upload(ctx, file, u.defaultFolder, publicID, "q_auto,f_auto,w_1000")
 	if err != nil {
-		return "", fmt.Errorf("cloudinary upload failed: %w", err)
+		log.Printf("[Cloudinary] %s: %v", fileHeader.Filename, err)
+		return "", err
 	}
-
-	// Return HTTPS URL
-	return result.SecureURL, nil
+	return url, nil
 }
 
-// UploadImageWithFolder allows custom folder (e.g., "sports/icons", "users/avatars")
 func (u *ImageUploader) UploadImageWithFolder(ctx context.Context, fileHeader *multipart.FileHeader, folder string) (string, error) {
-	// Temporarily change folder
-	originalFolder := u.defaultFolder
+	orig := u.defaultFolder
 	u.defaultFolder = folder
-	defer func() { u.defaultFolder = originalFolder }()
-
+	defer func() { u.defaultFolder = orig }()
 	return u.UploadImage(ctx, fileHeader)
 }
 
-// UPLOADER - Add this method
 func (u *ImageUploader) UploadFromBytes(ctx context.Context, data []byte, filename, folder string) (string, error) {
-	publicID := fmt.Sprintf("%s_%d", strings.TrimSuffix(filename, filepath.Ext(filename)), time.Now().Unix())
+	if len(data) == 0 {
+		return "", fmt.Errorf("empty file data")
+	}
+	if len(data) > maxFileSize {
+		return "", fmt.Errorf("file too large: max 5MB allowed")
+	}
+	ext := strings.ToLower(filepath.Ext(filename))
+	if !allowedImageExts[ext] {
+		return "", fmt.Errorf("icon must be an image (jpg, jpeg, png, webp); got %s", ext)
+	}
 
-	result, err := u.cld.Upload.Upload(ctx, bytes.NewReader(data), uploader.UploadParams{
-		Folder:         folder,
-		PublicID:       publicID,
-		ResourceType:   "image",
-		Transformation: "q_auto,f_auto",
-	})
-
+	publicID := u.makePublicID(filename)
+	url, err := u.upload(ctx, bytes.NewReader(data), folder, publicID, "q_auto,f_auto")
 	if err != nil {
+		log.Printf("[Cloudinary] %s: %v", filename, err)
 		return "", err
 	}
-	return result.SecureURL, nil
+	return url, nil
 }

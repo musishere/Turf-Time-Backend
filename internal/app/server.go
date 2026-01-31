@@ -7,6 +7,7 @@ import (
 	"github.com/musishere/sportsApp/config"
 	"github.com/musishere/sportsApp/internal/database"
 	"github.com/musishere/sportsApp/internal/handlers"
+	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/services"
@@ -25,9 +26,14 @@ func StartServer() {
 	locationRepo := repositories.NewLocationRepository(db)
 	sportsRepo := repositories.NewSportsRepositry(db)
 
+	imageUploader, err := helpers.NewImageUploader()
+	if err != nil {
+		log.Fatal("Cloudinary init failed:", err)
+	}
+
 	userService := services.NewUserService(userRepo, locationRepo, cfg.JWTSecret)
 	locationService := services.NewLocationService(locationRepo)
-	sportsService := services.NewSportsService(sportsRepo)
+	sportsService := services.NewSportsService(sportsRepo, imageUploader)
 
 	router := gin.Default()
 
@@ -56,4 +62,8 @@ func SetupRoutes(
 
 	// sports Routes
 	api.POST("/sports", handlers.NewSportsHandler(sportsService).RegisterNewSports)
+	api.GET("/sports", handlers.NewSportsHandler(sportsService).GetAllRegisteredSports)
+	api.GET("/sports/:id", handlers.NewSportsHandler(sportsService).GetRegisteredSportsByID)
+	api.PATCH("/sports/:id", handlers.NewSportsHandler(sportsService).UpdateRegisteredSports)
+	api.DELETE("/sports/:id", handlers.NewSportsHandler(sportsService).DeleteRegisterSports)
 }

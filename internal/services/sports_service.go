@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,38 +12,31 @@ import (
 )
 
 type SportsService struct {
-	repo *repositories.SportsRepository
+	repo     *repositories.SportsRepository
+	uploader *helpers.ImageUploader
 }
 
-func NewSportsService(repo *repositories.SportsRepository) *SportsService {
+func NewSportsService(repo *repositories.SportsRepository, uploader *helpers.ImageUploader) *SportsService {
 	return &SportsService{
-		repo: repo,
+		repo:     repo,
+		uploader: uploader,
 	}
 }
 
-// SERVICE - Accept bytes instead
 func (s *SportsService) CreateNewSport(
 	name string,
 	minPlayers, maxPlayers int,
 	fileBytes []byte,
 	filename string,
 ) (*models.Sports, error) {
-
 	if err := helpers.ValidateSportInput(name, minPlayers, maxPlayers); err != nil {
 		return nil, err
 	}
 
-	uploader, err := helpers.NewImageUploader()
-	if err != nil {
-		return nil, err
-	}
-
-	// Upload bytes instead of FileHeader (long timeout for slow networks / Cloudinary)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	// Use UploadFromBytes instead (see below)
-	imageURL, err := uploader.UploadFromBytes(ctx, fileBytes, filename, "sports")
+	imageURL, err := s.uploader.UploadFromBytes(ctx, fileBytes, filename, "sports")
 	if err != nil {
 		return nil, fmt.Errorf("upload failed: %w", err)
 	}
@@ -55,23 +49,56 @@ func (s *SportsService) CreateNewSport(
 
 	err = s.repo.CreateSport(sports)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create", err)
+		return nil, fmt.Errorf("failed to create sport: %w", err)
 	}
 
 	return sports, nil
 }
 
-func (s *SportsService) GetAllSports() (*models.Sports, error) { return &models.Sports{}, nil }
+func (s *SportsService) GetAllSports() (*[]models.Sports, error) {
+
+	sports := s.repo.GetSports()
+
+	if len(sports) == 0 {
+		return nil, errors.New("No sports found")
+	}
+
+	return &sports, nil
+}
 
 func (s *SportsService) GetSportsById(id string) (*models.Sports, error) {
-	return &models.Sports{}, nil
+	sports, err := s.repo.GetSportsByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sports, nil
 }
 
-func (s *SportsService) UpdateSports(id string) (*models.Sports, error) {
-	return &models.Sports{}, nil
-
+// UpdateSports updates only the fields that are non-nil (partial update).
+func (s *SportsService) UpdateSports(id string, name *string, minPlayers, maxPlayers *int) (*models.Sports, error) {
+	sport, err := s.repo.GetSportsByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if name != nil {
+		sport.Name = *name
+	}
+	if minPlayers != nil {
+		sport.MinPlayers = *minPlayers
+	}
+	if maxPlayers != nil {
+		sport.MaxPlayers = *maxPlayers
+	}
+	if err := helpers.ValidateSportInput(sport.Name, sport.MinPlayers, sport.MaxPlayers); err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateSport(&sport); err != nil {
+		return nil, fmt.Errorf("failed to update sport: %w", err)
+	}
+	return &sport, nil
 }
 
-func (s *SportsService) DeleteSports(id string) (string, error) {
-	return "", nil
+func (s *SportsService) DeleteSports(id string) error {
+	return s.repo.DeleteSport(id)
 }

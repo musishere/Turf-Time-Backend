@@ -110,7 +110,7 @@ func (s *SportsHandler) GetRegisteredSportsByID(c *gin.Context) {
 		return
 	}
 
-	sports, err := s.SportsService.GetSportsById(id)
+	sports, err := s.SportsService.GetSportsByID(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Not Found",
@@ -155,7 +155,7 @@ func (s *SportsHandler) UpdateRegisteredSports(c *gin.Context) {
 	c.JSON(http.StatusOK, SportsResponse{Sport: sport, Message: "Sport updated successfully"})
 }
 
-func (s *SportsHandler) DeleteRegisterSports(c *gin.Context) {
+func (s *SportsHandler) DeleteRegisteredSport(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty ID"})

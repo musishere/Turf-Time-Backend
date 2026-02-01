@@ -9,7 +9,7 @@ type SportsRepository struct {
 	db *gorm.DB
 }
 
-func NewSportsRepositry(db *gorm.DB) *SportsRepository {
+func NewSportsRepository(db *gorm.DB) *SportsRepository {
 	return &SportsRepository{
 		db: db,
 	}

@@ -66,7 +66,7 @@ func (s *SportsService) GetAllSports() (*[]models.Sports, error) {
 	return &sports, nil
 }
 
-func (s *SportsService) GetSportsById(id string) (*models.Sports, error) {
+func (s *SportsService) GetSportsByID(id string) (*models.Sports, error) {
 	sports, err := s.repo.GetSportsByID(id)
 	if err != nil {
 		return nil, err

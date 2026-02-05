@@ -13,10 +13,11 @@ type Turf struct {
 	EndTime    int       `gorm:"type:int;not null" json:"endTime"`
 	Status     string    `gorm:"type:varchar(50);default:'active'" json:"status"`
 	NoOfFields int       `gorm:"type:int;not null" json:"noOfFields"`
-	TurfImages []string  `gorm:"column:icon_url;type:varchar(255);not null" json:"iconUrl"`
+	TurfImages []string  `gorm:"column:turf_images;type:jsonb;serializer:json;not null" json:"turfImages"`
 
-	// Relationship 1: Turf belongs to a User (Owner/Admin)
-	Owner User `gorm:"foreignKey:OwnerID;references:ID" json:"owner,omitempty"`
+	// Relationship: Turf belongs to a User (Owner/Admin)
+	OwnerID uuid.UUID `gorm:"type:uuid;not null" json:"ownerId"`
+	Owner   User      `gorm:"foreignKey:OwnerID;references:ID" json:"owner,omitempty"`
 	// Standard timestamps
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

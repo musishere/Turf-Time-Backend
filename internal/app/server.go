@@ -7,26 +7,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/musishere/sportsApp/config"
 	"github.com/musishere/sportsApp/internal/database"
-	"github.com/musishere/sportsApp/internal/handlers"
 	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
+	"github.com/musishere/sportsApp/internal/routes"
 	"github.com/musishere/sportsApp/internal/services"
 	"golang.org/x/time/rate"
 )
 
 func StartServer() {
 	cfg := config.LoadConfig()
-
 	db := database.ConnectDatabase(cfg)
 
-	if err := db.AutoMigrate(&models.User{}, &models.Location{}, &models.Sports{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Location{}, &models.Sports{}, &models.Turf{}); err != nil {
 		log.Fatal("Database migration failed:", err)
 	}
 
 	userRepo := repositories.NewUserRepository(db)
 	locationRepo := repositories.NewLocationRepository(db)
 	sportsRepo := repositories.NewSportsRepository(db)
+	turfRepo := repositories.NewTurfRepository(db)
 
 	imageUploader, err := helpers.NewImageUploader()
 	if err != nil {
@@ -34,10 +34,10 @@ func StartServer() {
 	}
 
 	userService := services.NewUserService(userRepo, locationRepo, cfg.JWTSecret)
-	locationService := services.NewLocationService(locationRepo)
 	sportsService := services.NewSportsService(sportsRepo, imageUploader)
+	turfService := services.NewTurfService(turfRepo, imageUploader)
 
-	// Global rate limit: 100 req/sec, burst 50 (per server)
+	// Global rate limiter
 	limiter := rate.NewLimiter(rate.Limit(100), 50)
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {
@@ -48,35 +48,13 @@ func StartServer() {
 		c.Next()
 	})
 
-	SetupRoutes(router, userService, locationService, sportsService, cfg.JWTSecret)
+	api := router.Group("/api/v1")
+	routes.SetupUserRoutes(api, userService)
+	routes.SetupSportsRoutes(api, sportsService)
+	routes.SetupTurfRoutes(api, turfService)
 
 	log.Printf("Server running on port %s", cfg.ServerPort)
 	if err := router.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
-}
-
-func SetupRoutes(
-	router *gin.Engine,
-	userService *services.UserService,
-	locationService *services.LocationService,
-	sportsService *services.SportsService,
-	jwtSecret string,
-) {
-	api := router.Group("/api/v1")
-
-	// user routes
-	api.POST("/signup", handlers.NewUserHandler(userService).RegisterUser)
-	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
-	api.GET("/get-currentUser", handlers.NewUserHandler(userService).GetCurrentUser)
-	api.POST("/logout", handlers.NewUserHandler(userService).LogOutUser)
-
-	// sports routes
-	api.POST("/sports", handlers.NewSportsHandler(sportsService).RegisterNewSports)
-	api.GET("/sports", handlers.NewSportsHandler(sportsService).GetAllRegisteredSports)
-	api.GET("/sports/:id", handlers.NewSportsHandler(sportsService).GetRegisteredSportsByID)
-	api.PATCH("/sports/:id", handlers.NewSportsHandler(sportsService).UpdateRegisteredSports)
-	api.DELETE("/sports/:id", handlers.NewSportsHandler(sportsService).DeleteRegisteredSport)
-
-	// turf routes
 }

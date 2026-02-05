@@ -9,6 +9,7 @@ import (
 	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
+	"github.com/musishere/sportsApp/internal/validators"
 )
 
 type SportsService struct {
@@ -29,7 +30,7 @@ func (s *SportsService) CreateNewSport(
 	fileBytes []byte,
 	filename string,
 ) (*models.Sports, error) {
-	if err := helpers.ValidateSportInput(name, minPlayers, maxPlayers); err != nil {
+	if err := validators.ValidateSportInput(name, minPlayers, maxPlayers); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +91,7 @@ func (s *SportsService) UpdateSports(id string, name *string, minPlayers, maxPla
 	if maxPlayers != nil {
 		sport.MaxPlayers = *maxPlayers
 	}
-	if err := helpers.ValidateSportInput(sport.Name, sport.MinPlayers, sport.MaxPlayers); err != nil {
+	if err := validators.ValidateSportInput(sport.Name, sport.MinPlayers, sport.MaxPlayers); err != nil {
 		return nil, err
 	}
 	if err := s.repo.UpdateSport(&sport); err != nil {

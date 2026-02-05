@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/routes"
 	"github.com/musishere/sportsApp/internal/services"
+	"github.com/musishere/sportsApp/queue"
 	"golang.org/x/time/rate"
 )
 
@@ -23,16 +25,30 @@ func StartServer() {
 		log.Fatal("Database migration failed:", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Repositories
 	userRepo := repositories.NewUserRepository(db)
 	locationRepo := repositories.NewLocationRepository(db)
 	sportsRepo := repositories.NewSportsRepository(db)
 	turfRepo := repositories.NewTurfRepository(db)
 
+	// Amazon SQS
+	sqsClient, err := queue.NewClient(ctx)
+	if err != nil {
+		log.Fatal("Error creating client for amazonSqs", err)
+	}
+	queueURL := cfg.SQSQueueURL
+	go queue.StartWorkerPool(ctx, sqsClient, queueURL, 5)
+
+	// Image uploading
 	imageUploader, err := helpers.NewImageUploader()
 	if err != nil {
 		log.Fatal("Cloudinary init failed:", err)
 	}
 
+	// Services
 	userService := services.NewUserService(userRepo, locationRepo, cfg.JWTSecret)
 	sportsService := services.NewSportsService(sportsRepo, imageUploader)
 	turfService := services.NewTurfService(turfRepo, imageUploader)

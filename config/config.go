@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	ServerPort string
-	DBName     string
-	DBHost     string
-	DBUser     string
-	DBPass     string
-	DBPort     string
-	JWTSecret  string
+	ServerPort  string
+	DBName      string
+	DBHost      string
+	DBUser      string
+	DBPass      string
+	DBPort      string
+	JWTSecret   string
+	SQSQueueURL string
 }
 
 func validateConfig(cfg *Config) {
@@ -41,13 +42,14 @@ func LoadConfig() *Config {
 	}
 
 	cfg := &Config{
-		ServerPort: os.Getenv("SERVER_PORT"),
-		DBName:     os.Getenv("DB_NAME"),
-		DBHost:     os.Getenv("DB_HOST"),
-		DBUser:     os.Getenv("DB_USER"),
-		DBPass:     os.Getenv("DB_PASS"),
-		DBPort:     os.Getenv("DB_PORT"),
-		JWTSecret:  os.Getenv("JWT_SECRET"),
+		ServerPort:  os.Getenv("SERVER_PORT"),
+		DBName:      os.Getenv("DB_NAME"),
+		DBHost:      os.Getenv("DB_HOST"),
+		DBUser:      os.Getenv("DB_USER"),
+		DBPass:      os.Getenv("DB_PASS"),
+		DBPort:      os.Getenv("DB_PORT"),
+		JWTSecret:   os.Getenv("JWT_SECRET"),
+		SQSQueueURL: os.Getenv("SQS_QUEUE_URL"),
 	}
 
 	validateConfig(cfg)

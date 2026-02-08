@@ -4,6 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/musishere/sportsApp/config"
@@ -65,12 +69,51 @@ func StartServer() {
 	})
 
 	api := router.Group("/api/v1")
+
 	routes.SetupUserRoutes(api, userService)
 	routes.SetupSportsRoutes(api, sportsService)
 	routes.SetupTurfRoutes(api, turfService)
 
-	log.Printf("Server running on port %s", cfg.ServerPort)
-	if err := router.Run(":" + cfg.ServerPort); err != nil {
-		log.Fatal("Failed to start server:", err)
+	server := &http.Server{
+		Addr:         ":" + cfg.ServerPort,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	// Run server in goroutine so we can block on shutdown
+	go func() {
+		log.Printf("Server running on port %s", cfg.ServerPort)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	// Cancel context to stop SQS worker pool and other background work
+	cancel()
+
+	// Give server up to 30 seconds to finish in-flight requests
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	// Close database connection
+	if sqlDB, err := db.DB(); err == nil {
+		if err := sqlDB.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}
+
+	log.Println("Server exited gracefully")
 }

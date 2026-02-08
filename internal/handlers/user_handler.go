@@ -25,7 +25,7 @@ type RegisterRequest struct {
 	Password  string  `json:"password" binding:"required,min=6"`
 	Latitude  float64 `json:"latitude" binding:"required"`
 	Longitude float64 `json:"longitude" binding:"required"`
-	Cnic      string  `json:"cnic" binding:"required"`
+	Cnic      string  `json:"cnic"` // optional at signup; can be set later
 	Phone     string  `json:"phone" required:"true"`
 	Gender    string  `json:"gender" required:"true"`
 }
@@ -34,9 +34,18 @@ type CurrentUserResponse struct {
 	User interface{} `json:"user"`
 }
 
+// SignupUserResponse contains only the user fields returned on signup (token is in cookie).
+type SignupUserResponse struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	IsActive bool   `json:"is_active"`
+	Gender   string `json:"gender"`
+	Phone    string `json:"phone"`
+}
+
 type RegisterResponse struct {
-	User  interface{} `json:"user"`
-	Token string      `json:"token"`
+	User SignupUserResponse `json:"user"`
 }
 
 type LoginRequest struct {
@@ -62,6 +71,10 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
+	if req.Cnic == "" {
+		req.Cnic = " " // store space until set later
+	}
+
 	user, token, err := h.userService.Register(
 		req.Name,
 		req.Email,
@@ -80,18 +93,21 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		} else if err.Error() == "name, email, and password are required" {
 			statusCode = http.StatusBadRequest
 		}
-
-		c.JSON(statusCode, gin.H{
-			"error": err.Error(),
-		})
-
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 
 	c.JSON(http.StatusCreated, RegisterResponse{
-		User:  user,
-		Token: token,
+		User: SignupUserResponse{
+			Name:     user.Name,
+			Email:    user.Email,
+			Role:     user.Role,
+			IsActive: user.IsActive,
+			Gender:   user.Gender,
+			Phone:    user.Phone,
+		},
 	})
 }
 

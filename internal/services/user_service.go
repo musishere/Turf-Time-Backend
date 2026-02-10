@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"strconv"
 	"time"
 
@@ -62,6 +63,7 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 	}
 
 	// 3. Send OTP to phone
+	log.Printf("OTP sent to %s: %s", phone, otpStr)
 	if _, err := utils.SendExistingOTP(phone, otpStr); err != nil {
 		return nil, "", err
 	}

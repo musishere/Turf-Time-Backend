@@ -2,16 +2,12 @@ package services
 
 import (
 	"errors"
-	"log"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/musishere/sportsApp/internal/auth"
-	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
-	"github.com/musishere/sportsApp/internal/utils"
 	"github.com/musishere/sportsApp/internal/validators"
 )
 
@@ -43,6 +39,11 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 		return nil, "", errors.New("email already registered")
 	}
 
+	existingPhoneNumber, _ := s.userRepo.GetUserByPhone(phone)
+	if existingPhoneNumber != nil {
+		return nil, "", errors.New("phone number already registered")
+	}
+
 	hashedPassword, err := auth.HashPassword(password)
 	if err != nil {
 		return nil, "", err
@@ -54,21 +55,25 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 	}
 
 	// 1. Generate OTP
-	otpInt := helpers.GenerateOTP()
-	otpStr := strconv.Itoa(otpInt)
+	// otpInt := helpers.GenerateOTP()
+	// fmt.Print(otpInt)
+	// otpStr := strconv.Itoa(otpInt)
 
+	// OTP flow commented out for testing - create user directly with is_active true
+	// 1. Generate OTP
+	// otpInt := helpers.GenerateOTP()
+	// otpStr := strconv.Itoa(otpInt)
 	// 2. Store OTP and phone in Redis
-	if err := helpers.StoreOTP(phone, otpStr); err != nil {
-		return nil, "", err
-	}
-
+	// if err := helpers.StoreOTP(phone, otpStr); err != nil {
+	// 	return nil, "", err
+	// }
 	// 3. Send OTP to phone
-	log.Printf("OTP sent to %s: %s", phone, otpStr)
-	if _, err := utils.SendExistingOTP(phone, otpStr); err != nil {
-		return nil, "", err
-	}
+	// log.Printf("OTP sent to %s: %s", phone, otpStr)
+	// if _, err := utils.SendExistingOTP(phone, otpStr); err != nil {
+	// 	return nil, "", err
+	// }
 
-	// 4. Create user with is_active false until OTP is verified
+	// Create user with is_active true (OTP verification disabled for testing)
 	user := &models.User{
 		ID:        uuid.New(),
 		Name:      name,
@@ -77,7 +82,7 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 		Phone:     phone,
 		Gender:    gender,
 		Role:      "player",
-		IsActive:  false,
+		IsActive:  true, // Set to true for testing without OTP
 		Cnic:      cnicNumber,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -102,8 +107,13 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 
 	user.Location = *location
 
-	// No token until OTP verified; client must call verify-otp
-	return user, "", nil
+	// Generate token immediately (OTP verification disabled for testing)
+	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return user, token, nil
 }
 
 // ActivateUserByPhone sets user is_active to true after OTP was verified (call helpers.VerifyOTP first).

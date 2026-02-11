@@ -78,7 +78,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		req.Cnic = " " // store space until set later
 	}
 
-	user, _, err := h.userService.Register(
+	user, token, err := h.userService.Register(
 		req.Name,
 		req.Email,
 		req.Password,
@@ -103,10 +103,10 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// No token until OTP verified; do not set cookie
+	// OTP flow disabled for testing - set cookie and return token
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 	c.JSON(http.StatusCreated, gin.H{
-		"user":    SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
-		"message": "OTP sent to your phone. Please verify to activate your account.",
+		"user": SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
 	})
 }
 

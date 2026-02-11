@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -10,27 +11,27 @@ import (
 )
 
 // SendExistingOTP sends a provided OTP to the given phone number
-func SendExistingOTP(phone string, otp string) (string, error) {
-	// 1. Load AWS config
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+func SendOTPToPhoneNumber(phone string, otp string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
-		return "", fmt.Errorf("failed to load AWS config: %v", err)
+		log.Printf("AWS config error: %v", err)
+		return "", err
 	}
 
-	// 2. Create SNS client
-	snsClient := sns.NewFromConfig(cfg)
+	client := sns.NewFromConfig(cfg)
 
-	// 3. Prepare message
-	message := fmt.Sprintf("Your KHEL app OTP is: %s. It is valid for 5 minutes.", otp)
+	message := fmt.Sprintf("Your OTP is %s. Valid for 5 minutes.", otp)
 
-	// 4. Publish SMS
-	_, err = snsClient.Publish(context.TODO(), &sns.PublishInput{
+	output, err := client.Publish(context.Background(), &sns.PublishInput{
 		Message:     aws.String(message),
-		PhoneNumber: aws.String(phone), // Must be in E.164 format e.g., +923001234567
+		PhoneNumber: aws.String(phone),
 	})
+
 	if err != nil {
-		return "", fmt.Errorf("failed to send SMS: %v", err)
+		log.Printf("SNS Publish failed: %v", err)
+		return "", err
 	}
 
+	log.Printf("SNS MessageID: %s", *output.MessageId)
 	return "otp sent", nil
 }

@@ -63,9 +63,22 @@ func StartServer() {
 	sportsService := services.NewSportsService(sportsRepo, imageUploader)
 	turfService := services.NewTurfService(turfRepo, imageUploader)
 
-	//! Global rate limiter
-	limiter := rate.NewLimiter(rate.Limit(100), 50)
 	router := gin.Default()
+
+	// CORS - allow all origins
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
+	// Global rate limiter
+	limiter := rate.NewLimiter(rate.Limit(100), 50)
 	router.Use(func(c *gin.Context) {
 		if !limiter.Allow() {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})

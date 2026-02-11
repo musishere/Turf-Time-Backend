@@ -66,11 +66,13 @@ func StartServer() {
 
 	router := gin.Default()
 
-	// CORS - allow all origins
+	// CORS - allow all origins; reflect request origin so credentials (cookies) work
 	router.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
-		AllowMethods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:    []string{"Origin", "Content-Type", "Authorization"},
+		AllowOriginFunc:  func(origin string) bool { return true },
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
+		ExposeHeaders:    []string{"Content-Length"},
 	}))
 
 	// Global rate limiter

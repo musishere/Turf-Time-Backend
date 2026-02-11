@@ -8,6 +8,7 @@ import (
 	"github.com/musishere/sportsApp/internal/auth"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
+	"github.com/musishere/sportsApp/internal/validators"
 )
 
 type UserService struct {
@@ -29,13 +30,18 @@ func NewUserService(
 }
 
 func (s *UserService) Register(name, email, password, gender, phone, cnic string, latitude, longitude float64) (*models.User, string, error) {
-	if name == "" || email == "" || password == "" {
-		return nil, "", errors.New("name, email, and password are required")
+	if err := validators.ValidateRegisterInput(name, email, password, gender, phone, latitude, longitude); err != nil {
+		return nil, "", err
 	}
 
 	existingUser, _ := s.userRepo.GetUserByEmail(email)
 	if existingUser != nil {
 		return nil, "", errors.New("email already registered")
+	}
+
+	existingPhoneNumber, _ := s.userRepo.GetUserByPhone(phone)
+	if existingPhoneNumber != nil {
+		return nil, "", errors.New("phone number already registered")
 	}
 
 	hashedPassword, err := auth.HashPassword(password)
@@ -48,6 +54,26 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 		return nil, "", err
 	}
 
+	// 1. Generate OTP
+	// otpInt := helpers.GenerateOTP()
+	// fmt.Print(otpInt)
+	// otpStr := strconv.Itoa(otpInt)
+
+	// OTP flow commented out for testing - create user directly with is_active true
+	// 1. Generate OTP
+	// otpInt := helpers.GenerateOTP()
+	// otpStr := strconv.Itoa(otpInt)
+	// 2. Store OTP and phone in Redis
+	// if err := helpers.StoreOTP(phone, otpStr); err != nil {
+	// 	return nil, "", err
+	// }
+	// 3. Send OTP to phone
+	// log.Printf("OTP sent to %s: %s", phone, otpStr)
+	// if _, err := utils.SendExistingOTP(phone, otpStr); err != nil {
+	// 	return nil, "", err
+	// }
+
+	// Create user with is_active true (OTP verification disabled for testing)
 	user := &models.User{
 		ID:        uuid.New(),
 		Name:      name,
@@ -56,7 +82,7 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 		Phone:     phone,
 		Gender:    gender,
 		Role:      "player",
-		IsActive:  true,
+		IsActive:  true, // Set to true for testing without OTP
 		Cnic:      cnicNumber,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -81,6 +107,33 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 
 	user.Location = *location
 
+	// Generate token immediately (OTP verification disabled for testing)
+	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return user, token, nil
+}
+
+// ActivateUserByPhone sets user is_active to true after OTP was verified (call helpers.VerifyOTP first).
+func (s *UserService) ActivateUserByPhone(phone string) (*models.User, string, error) {
+	user, err := s.userRepo.GetUserByPhone(phone)
+	if err != nil {
+		return nil, "", errors.New("user not found for this phone")
+	}
+
+	user.IsActive = true
+	user.UpdatedAt = time.Now()
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return nil, "", err
+	}
+
+	location, _ := s.locationRepo.GetLocationByUserID(user.ID.String())
+	if location != nil {
+		user.Location = *location
+	}
+
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
 	if err != nil {
 		return nil, "", err
@@ -93,6 +146,10 @@ func (s *UserService) Login(email, password string, latitude, longitude float64)
 	user, err := s.userRepo.GetUserByEmail(email)
 	if err != nil {
 		return nil, "", err
+	}
+
+	if !user.IsActive {
+		return nil, "", errors.New("please verify your phone with OTP first")
 	}
 
 	if err := auth.VerifyPassword(user.Password, password); err != nil {

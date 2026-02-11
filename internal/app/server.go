@@ -11,18 +11,24 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/musishere/sportsApp/config"
+	"github.com/musishere/sportsApp/internal/cache"
 	"github.com/musishere/sportsApp/internal/database"
 	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
+	"github.com/musishere/sportsApp/internal/queue"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/routes"
 	"github.com/musishere/sportsApp/internal/services"
-	"github.com/musishere/sportsApp/queue"
 	"golang.org/x/time/rate"
 )
 
 func StartServer() {
 	cfg := config.LoadConfig()
+
+	//! Redis cache
+	cache.ConnectRedis()
+
+	//! connect database
 	db := database.ConnectDatabase(cfg)
 
 	if err := db.AutoMigrate(&models.User{}, &models.Location{}, &models.Sports{}, &models.Turf{}); err != nil {
@@ -32,13 +38,13 @@ func StartServer() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Repositories
+	//! Repositories
 	userRepo := repositories.NewUserRepository(db)
 	locationRepo := repositories.NewLocationRepository(db)
 	sportsRepo := repositories.NewSportsRepository(db)
 	turfRepo := repositories.NewTurfRepository(db)
 
-	// Amazon SQS
+	//! Amazon SQS
 	sqsClient, err := queue.NewClient(ctx)
 	if err != nil {
 		log.Fatal("Error creating client for amazonSqs", err)
@@ -46,18 +52,18 @@ func StartServer() {
 	queueURL := cfg.SQSQueueURL
 	go queue.StartWorkerPool(ctx, sqsClient, queueURL, 5)
 
-	// Image uploading
+	//! Image uploading
 	imageUploader, err := helpers.NewImageUploader()
 	if err != nil {
 		log.Fatal("Cloudinary init failed:", err)
 	}
 
-	// Services
+	//! Services
 	userService := services.NewUserService(userRepo, locationRepo, cfg.JWTSecret)
 	sportsService := services.NewSportsService(sportsRepo, imageUploader)
 	turfService := services.NewTurfService(turfRepo, imageUploader)
 
-	// Global rate limiter
+	//! Global rate limiter
 	limiter := rate.NewLimiter(rate.Limit(100), 50)
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {

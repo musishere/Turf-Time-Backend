@@ -36,6 +36,14 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) GetUserByPhone(phone string) (*models.User, error) {
+	var user models.User
+	if err := r.db.First(&user, "phone = ?", phone).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *UserRepository) UpdateUser(user *models.User) error {
 	return r.db.Save(user).Error
 }

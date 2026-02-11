@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/musishere/sportsApp/config"
 	"github.com/musishere/sportsApp/internal/auth"
+	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/services"
+	"github.com/musishere/sportsApp/internal/validators"
 )
 
 type UserHandler struct {
@@ -90,24 +93,55 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		statusCode := http.StatusInternalServerError
 		if err.Error() == "email already registered" {
 			statusCode = http.StatusConflict
-		} else if err.Error() == "name, email, and password are required" {
-			statusCode = http.StatusBadRequest
+		} else {
+			var ve *validators.ValidationError
+			if errors.As(err, &ve) {
+				statusCode = http.StatusBadRequest
+			}
+		}
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
+	}
+
+	// OTP flow disabled for testing - set cookie and return token
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
+	c.JSON(http.StatusCreated, gin.H{
+		"user": SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+	})
+}
+
+type VerifyOtpRequest struct {
+	Phone string `json:"phone" binding:"required"`
+	Otp   string `json:"otp" binding:"required"`
+}
+
+func (h *UserHandler) VerifyOtp(c *gin.Context) {
+	var req VerifyOtpRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and otp are required"})
+		return
+	}
+
+	ok, err := helpers.VerifyOTP(req.Phone, req.Otp)
+	if err != nil || !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired OTP"})
+		return
+	}
+
+	user, token, err := h.userService.ActivateUserByPhone(req.Phone)
+	if err != nil {
+		statusCode := http.StatusBadRequest
+		if err.Error() == "user not found for this phone" {
+			statusCode = http.StatusNotFound
 		}
 		c.JSON(statusCode, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
-
-	c.JSON(http.StatusCreated, RegisterResponse{
-		User: SignupUserResponse{
-			Name:     user.Name,
-			Email:    user.Email,
-			Role:     user.Role,
-			IsActive: user.IsActive,
-			Gender:   user.Gender,
-			Phone:    user.Phone,
-		},
+	c.JSON(http.StatusOK, gin.H{
+		"user":    SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+		"message": "Phone verified. Account is now active.",
 	})
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/validators"
+	"github.com/musishere/sportsApp/types"
 )
 
 type SportsService struct {
@@ -24,27 +25,22 @@ func NewSportsService(repo *repositories.SportsRepository, uploader *helpers.Ima
 	}
 }
 
-func (s *SportsService) CreateNewSport(
-	name string,
-	minPlayers, maxPlayers int,
-	fileBytes []byte,
-	filename string,
-) (*models.Sports, error) {
-	if err := validators.ValidateSportInput(name, minPlayers, maxPlayers); err != nil {
+func (s *SportsService) CreateNewSport(req types.CreateSportRequest) (*models.Sports, error) {
+	if err := validators.ValidateSportInput(req.Name, req.MinPlayers, req.MaxPlayers); err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	imageURL, err := s.uploader.UploadFromBytes(ctx, fileBytes, filename, "sports")
+	imageURL, err := s.uploader.UploadFromBytes(ctx, req.FileBytes, req.Filename, "sports")
 	if err != nil {
 		return nil, fmt.Errorf("upload failed: %w", err)
 	}
 	sports := &models.Sports{
-		Name:       name,
-		MinPlayers: minPlayers,
-		MaxPlayers: maxPlayers,
+		Name:       req.Name,
+		MinPlayers: req.MinPlayers,
+		MaxPlayers: req.MaxPlayers,
 		IconUrl:    imageURL,
 	}
 
@@ -77,19 +73,19 @@ func (s *SportsService) GetSportsByID(id string) (*models.Sports, error) {
 }
 
 // UpdateSports updates only the fields that are non-nil (partial update).
-func (s *SportsService) UpdateSports(id string, name *string, minPlayers, maxPlayers *int) (*models.Sports, error) {
+func (s *SportsService) UpdateSports(id string, req types.UpdateSportRequest) (*models.Sports, error) {
 	sport, err := s.repo.GetSportsByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if name != nil {
-		sport.Name = *name
+	if req.Name != nil {
+		sport.Name = *req.Name
 	}
-	if minPlayers != nil {
-		sport.MinPlayers = *minPlayers
+	if req.MinPlayers != nil {
+		sport.MinPlayers = *req.MinPlayers
 	}
-	if maxPlayers != nil {
-		sport.MaxPlayers = *maxPlayers
+	if req.MaxPlayers != nil {
+		sport.MaxPlayers = *req.MaxPlayers
 	}
 	if err := validators.ValidateSportInput(sport.Name, sport.MinPlayers, sport.MaxPlayers); err != nil {
 		return nil, err

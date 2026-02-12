@@ -3,42 +3,17 @@ package handlers
 import (
 	"errors"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/services"
+	"github.com/musishere/sportsApp/types"
 	"gorm.io/gorm"
 )
 
 type SportsHandler struct {
 	SportsService services.SportsService
-}
-
-type SportsRequest struct {
-	Name       string                `form:"name" binding:"required"`
-	IconUrl    *multipart.FileHeader `form:"iconUrl" binding:"required"`
-	MinPlayers int                   `form:"minPlayer" binding:"required"`
-	MaxPlayers int                   `form:"maxPlayer" binding:"required"`
-}
-
-// UpdateSportRequest: all fields optional — send only what you want to change.
-type UpdateSportRequest struct {
-	Name       *string `json:"name" form:"name"`
-	MinPlayers *int    `json:"minPlayers" form:"minPlayers"`
-	MaxPlayers *int    `json:"maxPlayers" form:"maxPlayers"`
-}
-
-type SportsResponse struct {
-	Sport   *models.Sports
-	Message string
-}
-
-type GetAllSportsResponse struct {
-	Sport   *[]models.Sports
-	Message string
 }
 
 func NewSportsHandler(sportsService *services.SportsService) *SportsHandler {
@@ -75,7 +50,15 @@ func (s *SportsHandler) RegisterNewSports(c *gin.Context) {
 		return
 	}
 
-	sport, err := s.SportsService.CreateNewSport(name, minPlayers, maxPlayers, fileBytes, fileHeader.Filename)
+	req := types.CreateSportRequest{
+		Name:       name,
+		MinPlayers: minPlayers,
+		MaxPlayers: maxPlayers,
+		FileBytes:  fileBytes,
+		Filename:   fileHeader.Filename,
+	}
+
+	sport, err := s.SportsService.CreateNewSport(req)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -94,7 +77,7 @@ func (s *SportsHandler) GetAllRegisteredSports(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, GetAllSportsResponse{
+	c.JSON(http.StatusOK, types.GetAllSportsResponse{
 		Message: "Sports Fetched Successfully",
 		Sport:   sports,
 	})
@@ -119,7 +102,7 @@ func (s *SportsHandler) GetRegisteredSportsByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, SportsResponse{
+	c.JSON(http.StatusOK, types.SportsResponse{
 		Sport: sports,
 	})
 
@@ -132,7 +115,7 @@ func (s *SportsHandler) UpdateRegisteredSports(c *gin.Context) {
 		return
 	}
 
-	var req UpdateSportRequest
+	var req types.UpdateSportRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
@@ -143,7 +126,7 @@ func (s *SportsHandler) UpdateRegisteredSports(c *gin.Context) {
 		return
 	}
 
-	sport, err := s.SportsService.UpdateSports(id, req.Name, req.MinPlayers, req.MaxPlayers)
+	sport, err := s.SportsService.UpdateSports(id, req)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found", "details": "sport not found"})
@@ -152,7 +135,7 @@ func (s *SportsHandler) UpdateRegisteredSports(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, SportsResponse{Sport: sport, Message: "Sport updated successfully"})
+	c.JSON(http.StatusOK, types.SportsResponse{Sport: sport, Message: "Sport updated successfully"})
 }
 
 func (s *SportsHandler) DeleteRegisteredSport(c *gin.Context) {

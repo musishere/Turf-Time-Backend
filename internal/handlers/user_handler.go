@@ -8,8 +8,10 @@ import (
 	"github.com/musishere/sportsApp/config"
 	"github.com/musishere/sportsApp/internal/auth"
 	"github.com/musishere/sportsApp/internal/helpers"
+	"github.com/musishere/sportsApp/internal/oauth"
 	"github.com/musishere/sportsApp/internal/services"
 	"github.com/musishere/sportsApp/internal/validators"
+	"github.com/musishere/sportsApp/types"
 )
 
 type UserHandler struct {
@@ -20,17 +22,6 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 	return &UserHandler{
 		userService: userService,
 	}
-}
-
-type RegisterRequest struct {
-	Name      string  `json:"name" binding:"required"`
-	Email     string  `json:"email" binding:"required,email"`
-	Password  string  `json:"password" binding:"required,min=6"`
-	Latitude  float64 `json:"latitude" binding:"required"`
-	Longitude float64 `json:"longitude" binding:"required"`
-	Cnic      string  `json:"cnic"` // optional at signup; can be set later
-	Phone     string  `json:"phone" required:"true"`
-	Gender    string  `json:"gender" required:"true"`
 }
 
 type CurrentUserResponse struct {
@@ -51,20 +42,13 @@ type RegisterResponse struct {
 	User SignupUserResponse `json:"user"`
 }
 
-type LoginRequest struct {
-	Email     string  `json:"email" binding:"required,email"`
-	Password  string  `json:"password" binding:"required,min=6"`
-	Latitude  float64 `json:"latitude" binding:"required"`
-	Longitude float64 `json:"longitude" binding:"required"`
-}
-
 type LoginResponse struct {
 	User  interface{} `json:"user"`
 	Token string      `json:"token"`
 }
 
 func (h *UserHandler) RegisterUser(c *gin.Context) {
-	var req RegisterRequest
+	var req types.RegisterRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -78,16 +62,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		req.Cnic = " " // store space until set later
 	}
 
-	user, token, err := h.userService.Register(
-		req.Name,
-		req.Email,
-		req.Password,
-		req.Gender,
-		req.Phone,
-		req.Cnic,
-		req.Latitude,
-		req.Longitude,
-	)
+	user, token, err := h.userService.Register(req)
 
 	if err != nil {
 		statusCode := http.StatusInternalServerError
@@ -110,13 +85,8 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	})
 }
 
-type VerifyOtpRequest struct {
-	Phone string `json:"phone" binding:"required"`
-	Otp   string `json:"otp" binding:"required"`
-}
-
 func (h *UserHandler) VerifyOtp(c *gin.Context) {
-	var req VerifyOtpRequest
+	var req types.VerifyOtpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and otp are required"})
 		return
@@ -128,7 +98,7 @@ func (h *UserHandler) VerifyOtp(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.userService.ActivateUserByPhone(req.Phone)
+	user, token, err := h.userService.ActivateUserByPhone(types.ActivateUserRequest{Phone: req.Phone})
 	if err != nil {
 		statusCode := http.StatusBadRequest
 		if err.Error() == "user not found for this phone" {
@@ -147,14 +117,14 @@ func (h *UserHandler) VerifyOtp(c *gin.Context) {
 
 func (h *UserHandler) LoginUser(c *gin.Context) {
 
-	var requestBody LoginRequest
+	var requestBody types.LoginRequest
 
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Bad request"})
 		return
 	}
 
-	user, token, err := h.userService.Login(requestBody.Email, requestBody.Password, requestBody.Latitude, requestBody.Longitude)
+	user, token, err := h.userService.Login(requestBody)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid username or password"})
@@ -199,4 +169,24 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
 
+}
+
+func (h *UserHandler) SignUpOauth2Facebook(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing code parameter"})
+		return
+	}
+
+	userInfo, err := oauth.ConnectToFacebook(code)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Return the user info
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Facebook login successful",
+		"user":    userInfo,
+	})
 }

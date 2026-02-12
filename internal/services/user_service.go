@@ -9,6 +9,7 @@ import (
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/validators"
+	"github.com/musishere/sportsApp/types"
 )
 
 type UserService struct {
@@ -29,27 +30,27 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) Register(name, email, password, gender, phone, cnic string, latitude, longitude float64) (*models.User, string, error) {
-	if err := validators.ValidateRegisterInput(name, email, password, gender, phone, latitude, longitude); err != nil {
+func (s *UserService) Register(req types.RegisterRequest) (*models.User, string, error) {
+	if err := validators.ValidateRegisterInput(req.Name, req.Email, req.Password, req.Gender, req.Phone, req.Latitude, req.Longitude); err != nil {
 		return nil, "", err
 	}
 
-	existingUser, _ := s.userRepo.GetUserByEmail(email)
+	existingUser, _ := s.userRepo.GetUserByEmail(req.Email)
 	if existingUser != nil {
 		return nil, "", errors.New("email already registered")
 	}
 
-	existingPhoneNumber, _ := s.userRepo.GetUserByPhone(phone)
+	existingPhoneNumber, _ := s.userRepo.GetUserByPhone(req.Phone)
 	if existingPhoneNumber != nil {
 		return nil, "", errors.New("phone number already registered")
 	}
 
-	hashedPassword, err := auth.HashPassword(password)
+	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
 		return nil, "", err
 	}
 
-	cnicNumber, err := auth.HashedCnic(cnic)
+	cnicNumber, err := auth.HashedCnic(req.Cnic)
 	if err != nil {
 		return nil, "", err
 	}
@@ -74,11 +75,11 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 	// Create user with is_active true (OTP verification disabled for testing)
 	user := &models.User{
 		ID:        uuid.New(),
-		Name:      name,
-		Email:     email,
+		Name:      req.Name,
+		Email:     req.Email,
 		Password:  hashedPassword,
-		Phone:     phone,
-		Gender:    gender,
+		Phone:     req.Phone,
+		Gender:    req.Gender,
 		Role:      "player",
 		IsActive:  true, // Set to true for testing without OTP
 		Cnic:      cnicNumber,
@@ -93,8 +94,8 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 	location := &models.Location{
 		ID:        uuid.New().String(),
 		UserID:    user.ID.String(),
-		Latitude:  latitude,
-		Longitude: longitude,
+		Latitude:  req.Latitude,
+		Longitude: req.Longitude,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -115,8 +116,8 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 }
 
 // ActivateUserByPhone sets user is_active to true after OTP was verified (call helpers.VerifyOTP first).
-func (s *UserService) ActivateUserByPhone(phone string) (*models.User, string, error) {
-	user, err := s.userRepo.GetUserByPhone(phone)
+func (s *UserService) ActivateUserByPhone(req types.ActivateUserRequest) (*models.User, string, error) {
+	user, err := s.userRepo.GetUserByPhone(req.Phone)
 	if err != nil {
 		return nil, "", errors.New("user not found for this phone")
 	}
@@ -140,8 +141,8 @@ func (s *UserService) ActivateUserByPhone(phone string) (*models.User, string, e
 	return user, token, nil
 }
 
-func (s *UserService) Login(email, password string, latitude, longitude float64) (*models.User, string, error) {
-	user, err := s.userRepo.GetUserByEmail(email)
+func (s *UserService) Login(req types.LoginRequest) (*models.User, string, error) {
+	user, err := s.userRepo.GetUserByEmail(req.Email)
 	if err != nil {
 		return nil, "", err
 	}
@@ -150,7 +151,7 @@ func (s *UserService) Login(email, password string, latitude, longitude float64)
 		return nil, "", errors.New("please verify your phone with OTP first")
 	}
 
-	if err := auth.VerifyPassword(user.Password, password); err != nil {
+	if err := auth.VerifyPassword(user.Password, req.Password); err != nil {
 		return nil, "", err
 	}
 
@@ -164,8 +165,8 @@ func (s *UserService) Login(email, password string, latitude, longitude float64)
 		return nil, "", err
 	}
 
-	location.Latitude = latitude
-	location.Longitude = longitude
+	location.Latitude = req.Latitude
+	location.Longitude = req.Longitude
 
 	if err := s.locationRepo.UpdateLocation(location); err != nil {
 		return nil, "", err

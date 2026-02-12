@@ -60,9 +60,7 @@ func (s *UserService) Register(name, email, password, gender, phone, cnic string
 	// otpStr := strconv.Itoa(otpInt)
 
 	// OTP flow commented out for testing - create user directly with is_active true
-	// 1. Generate OTP
-	// otpInt := helpers.GenerateOTP()
-	// otpStr := strconv.Itoa(otpInt)
+
 	// 2. Store OTP and phone in Redis
 	// if err := helpers.StoreOTP(phone, otpStr); err != nil {
 	// 	return nil, "", err

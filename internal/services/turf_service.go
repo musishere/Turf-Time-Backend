@@ -43,6 +43,12 @@ func (s *TurfService) CreateTurf(
 		return nil, err
 	}
 
+	// Resolve address to lat/lng via Google Maps Geocoding API
+	lat, lng, err := helpers.GeocodeAddress(address)
+	if err != nil {
+		return nil, fmt.Errorf("geocoding address: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -76,6 +82,8 @@ func (s *TurfService) CreateTurf(
 		Status:     status,
 		NoOfFields: noOfFields,
 		Address:    address,
+		Latitude:   lat,
+		Longitude:  lng,
 		TurfImages: []string{url1, url2, url3},
 		OwnerID:    ownerID,
 	}

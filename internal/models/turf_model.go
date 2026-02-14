@@ -13,8 +13,10 @@ type Turf struct {
 	EndTime    int       `gorm:"type:int;not null" json:"endTime"`
 	Status     string    `gorm:"type:varchar(50);default:'active'" json:"status"`
 	NoOfFields int       `gorm:"type:int;not null" json:"noOfFields"`
-	Address    string    `gorm:"type:varchar(255);not null" json:"address"`
+	Address    string    `gorm:"type:varchar(255);not null;default:''" json:"address"`
 	TurfImages []string  `gorm:"column:turf_images;type:jsonb;serializer:json;not null" json:"turfImages"`
+	Longitude  float64   `gorm:"type:double precision;not null;default:0" json:"longitude"`
+	Latitude   float64   `gorm:"type:double precision;not null;default:0" json:"latitude"`
 
 	// Relationship: Turf belongs to a User (Owner/Admin)
 	OwnerID uuid.UUID `gorm:"type:uuid;not null" json:"ownerId"`

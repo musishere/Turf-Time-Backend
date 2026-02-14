@@ -18,7 +18,7 @@ const (
 
 // ValidateTurfInput validates turf name, start/end time, status, and noOfFields.
 // startTime and endTime are hours of day (0-23).
-func ValidateTurfInput(name string, startTime, endTime int, status string, noOfFields int) error {
+func ValidateTurfInput(name string, startTime, endTime int, status string, noOfFields int, address string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name is required")
 	}
@@ -42,6 +42,10 @@ func ValidateTurfInput(name string, startTime, endTime int, status string, noOfF
 	}
 	if noOfFields > maxNoOfFields {
 		return errors.New("noOfFields exceeds maximum allowed")
+	}
+
+	if strings.TrimSpace(address) == "" {
+		return errors.New("address is required")
 	}
 
 	return nil

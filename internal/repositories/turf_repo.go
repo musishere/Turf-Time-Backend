@@ -16,5 +16,8 @@ func NewTurfRepository(db *gorm.DB) *TurfRepostitory {
 }
 
 func (r *TurfRepostitory) Create(turf *models.Turf) error {
-	return r.db.Create(turf).Error
+	if err := r.db.Create(turf).Error; err != nil {
+		return err
+	}
+	return r.db.Preload("Owner").Preload("Owner.Location").First(turf, turf.ID).Error
 }

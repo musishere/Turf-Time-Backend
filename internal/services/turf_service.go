@@ -3,8 +3,10 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/musishere/sportsApp/internal/helpers"
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
@@ -29,34 +31,42 @@ func (s *TurfService) CreateTurf(
 	startTime, endTime int,
 	status string,
 	noOfFields int,
+	address string,
+	ownerID uuid.UUID,
 	img1, img2, img3 []byte,
 	filename1, filename2, filename3 string,
 ) (*models.Turf, error) {
 	if status == "" {
 		status = "active"
 	}
-	if err := validators.ValidateTurfInput(name, startTime, endTime, status, noOfFields); err != nil {
+	if err := validators.ValidateTurfInput(name, startTime, endTime, status, noOfFields, address); err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	upload := func(data []byte, filename string) (string, error) {
 		return s.uploader.UploadFromBytes(ctx, data, filename, "turfs")
 	}
 
-	url1, err := upload(img1, filename1)
-	if err != nil {
-		return nil, fmt.Errorf("upload image 1: %w", err)
+	var url1, url2, url3 string
+	var err1, err2, err3 error
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() { defer wg.Done(); url1, err1 = upload(img1, filename1) }()
+	go func() { defer wg.Done(); url2, err2 = upload(img2, filename2) }()
+	go func() { defer wg.Done(); url3, err3 = upload(img3, filename3) }()
+	wg.Wait()
+
+	if err1 != nil {
+		return nil, fmt.Errorf("upload image 1: %w", err1)
 	}
-	url2, err := upload(img2, filename2)
-	if err != nil {
-		return nil, fmt.Errorf("upload image 2: %w", err)
+	if err2 != nil {
+		return nil, fmt.Errorf("upload image 2: %w", err2)
 	}
-	url3, err := upload(img3, filename3)
-	if err != nil {
-		return nil, fmt.Errorf("upload image 3: %w", err)
+	if err3 != nil {
+		return nil, fmt.Errorf("upload image 3: %w", err3)
 	}
 
 	turf := &models.Turf{
@@ -65,7 +75,9 @@ func (s *TurfService) CreateTurf(
 		EndTime:    endTime,
 		Status:     status,
 		NoOfFields: noOfFields,
+		Address:    address,
 		TurfImages: []string{url1, url2, url3},
+		OwnerID:    ownerID,
 	}
 	if err := s.repo.Create(turf); err != nil {
 		return nil, fmt.Errorf("failed to create turf: %w", err)

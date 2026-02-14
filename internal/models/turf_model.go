@@ -13,6 +13,7 @@ type Turf struct {
 	EndTime    int       `gorm:"type:int;not null" json:"endTime"`
 	Status     string    `gorm:"type:varchar(50);default:'active'" json:"status"`
 	NoOfFields int       `gorm:"type:int;not null" json:"noOfFields"`
+	Address    string    `gorm:"type:varchar(255);not null" json:"address"`
 	TurfImages []string  `gorm:"column:turf_images;type:jsonb;serializer:json;not null" json:"turfImages"`
 
 	// Relationship: Turf belongs to a User (Owner/Admin)

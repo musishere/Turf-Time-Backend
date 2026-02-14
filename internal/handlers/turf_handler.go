@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/musishere/sportsApp/internal/services"
 )
 
@@ -27,6 +28,12 @@ func (h *TurfHandler) RegisterTurf(c *gin.Context) {
 	endTime, _ := strconv.Atoi(c.PostForm("endTime"))
 	status := c.PostForm("status")
 	noOfFields, _ := strconv.Atoi(c.PostForm("noOfFields"))
+	address := c.PostForm("address")
+	ownerID, err := uuid.Parse(c.PostForm("ownerId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ownerId is required and must be a valid UUID"})
+		return
+	}
 
 	readFile := func(field string) ([]byte, string, error) {
 		fileHeader, err := c.FormFile(field)
@@ -47,21 +54,21 @@ func (h *TurfHandler) RegisterTurf(c *gin.Context) {
 
 	img1, fn1, err := readFile("image1")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image1 is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image1 is required (form-data key 'image1', type: File)", "details": err.Error()})
 		return
 	}
 	img2, fn2, err := readFile("image2")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image2 is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image2 is required (form-data key 'image2', type: File)", "details": err.Error()})
 		return
 	}
 	img3, fn3, err := readFile("image3")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image3 is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image3 is required (form-data key 'image3', type: File)", "details": err.Error()})
 		return
 	}
 
-	turf, err := h.turfService.CreateTurf(name, startTime, endTime, status, noOfFields, img1, img2, img3, fn1, fn2, fn3)
+	turf, err := h.turfService.CreateTurf(name, startTime, endTime, status, noOfFields, address, ownerID, img1, img2, img3, fn1, fn2, fn3)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

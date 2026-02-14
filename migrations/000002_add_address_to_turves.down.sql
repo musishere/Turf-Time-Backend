@@ -1,0 +1,1 @@
+ALTER TABLE turves DROP COLUMN IF EXISTS address;

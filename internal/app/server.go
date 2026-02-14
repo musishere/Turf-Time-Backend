@@ -15,7 +15,6 @@ import (
 	"github.com/musishere/sportsApp/internal/cache"
 	"github.com/musishere/sportsApp/internal/database"
 	"github.com/musishere/sportsApp/internal/helpers"
-	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/queue"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/routes"
@@ -31,10 +30,7 @@ func StartServer() {
 
 	//! connect database
 	db := database.ConnectDatabase(cfg)
-
-	if err := db.AutoMigrate(&models.User{}, &models.Location{}, &models.Sports{}, &models.Turf{}); err != nil {
-		log.Fatal("Database migration failed:", err)
-	}
+	// Schema is managed by golang-migrate (make migrate-up). Do not use AutoMigrate here.
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

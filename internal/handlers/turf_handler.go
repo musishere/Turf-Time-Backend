@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/musishere/sportsApp/internal/services"
+	"github.com/musishere/sportsApp/types"
 )
 
 type TurfHandler struct {
@@ -76,7 +77,50 @@ func (h *TurfHandler) RegisterTurf(c *gin.Context) {
 	c.JSON(http.StatusCreated, turf)
 }
 
-func (h *TurfHandler) GetRegisteredTurfs(c *gin.Context)    {}
-func (h *TurfHandler) GetRegisteredTurfByID(c *gin.Context) {}
-func (h *TurfHandler) UpdateRegisteredTurf(c *gin.Context)  {}
-func (h *TurfHandler) DeleteRegisteredTurf(c *gin.Context)  {}
+func (h *TurfHandler) GetRegisteredTurfs(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	turfs, total, err := h.turfService.GetAllTurf(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"turfs": turfs,
+		"total": total,
+	})
+}
+func (h *TurfHandler) GetRegisteredTurfByID(c *gin.Context) {
+	id := c.Param("id")
+	turf, err := h.turfService.GetTurfByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Turf not found"})
+		return
+	}
+	c.JSON(http.StatusOK, turf)
+}
+
+func (h *TurfHandler) UpdateRegisteredTurf(c *gin.Context) {
+	id := c.Param("id")
+	var req types.UpdateTurfRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	updatedTurf, err := h.turfService.UpdateTurf(id, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updatedTurf)
+}
+
+func (h *TurfHandler) DeleteRegisteredTurf(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.turfService.DeleteTurf(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Turf deleted successfully"})
+}

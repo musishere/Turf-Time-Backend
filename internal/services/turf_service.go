@@ -11,6 +11,7 @@ import (
 	"github.com/musishere/sportsApp/internal/models"
 	"github.com/musishere/sportsApp/internal/repositories"
 	"github.com/musishere/sportsApp/internal/validators"
+	"github.com/musishere/sportsApp/types"
 )
 
 type TurfService struct {
@@ -93,7 +94,60 @@ func (s *TurfService) CreateTurf(
 	return turf, nil
 }
 
-func (r *TurfService) GetTurfByID() (*models.Turf, error)  { return &models.Turf{}, nil }
-func (r *TurfService) GetAllTurf() (*[]models.Turf, error) { return &[]models.Turf{}, nil }
-func (r *TurfService) UpdateTurf() (*models.Turf, error)   { return &models.Turf{}, nil }
-func (r *TurfService) DeleteTurf() (string, error)         { return "", nil }
+func (r *TurfService) GetTurfByID(id string) (*models.Turf, error) {
+	return r.repo.GetTurfByID(id)
+}
+
+func (r *TurfService) GetAllTurf(page, pageSize int) ([]models.Turf, int64, error) {
+	turfs, total, err := r.repo.GetAllTurfsRepo(page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	return turfs, total, nil
+}
+func (r *TurfService) UpdateTurf(id string, req types.UpdateTurfRequest) (*models.Turf, error) {
+	turf, err := r.repo.GetTurfByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if req.Name != nil {
+		turf.Name = *req.Name
+	}
+	if req.StartTime != nil {
+		turf.StartTime = *req.StartTime
+	}
+	if req.EndTime != nil {
+		turf.EndTime = *req.EndTime
+	}
+	if req.Status != nil {
+		turf.Status = *req.Status
+	}
+	if req.NoOfFields != nil {
+		turf.NoOfFields = *req.NoOfFields
+	}
+	if req.Address != nil {
+		turf.Address = *req.Address
+		// update lat/lng when address changes
+		lat, lng, gerr := helpers.GeocodeAddress(turf.Address)
+		if gerr != nil {
+			return nil, fmt.Errorf("geocoding address: %w", gerr)
+		}
+		turf.Latitude = lat
+		turf.Longitude = lng
+	}
+
+	if err := validators.ValidateTurfInput(turf.Name, turf.StartTime, turf.EndTime, turf.Status, turf.NoOfFields, turf.Address); err != nil {
+		return nil, err
+	}
+
+	turf.UpdatedAt = time.Now()
+
+	if err := r.repo.UpdateTurf(turf); err != nil {
+		return nil, fmt.Errorf("failed to update turf: %w", err)
+	}
+	return turf, nil
+}
+
+func (r *TurfService) DeleteTurf(id string) error {
+	return r.repo.DeleteTurf(id)
+}

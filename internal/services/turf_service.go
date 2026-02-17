@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -43,10 +44,20 @@ func (s *TurfService) CreateTurf(
 		return nil, err
 	}
 
-	// Resolve address to lat/lng via Google Maps Geocoding API
-	lat, lng, err := helpers.GeocodeAddress(address)
+	// Resolve address to lat/lng via LocationIQ Geocoding API
+	locationResponse, err := helpers.GeocodeAddress(address)
 	if err != nil {
 		return nil, fmt.Errorf("geocoding address: %w", err)
+	}
+
+	// Convert string coordinates to float64
+	lat, err := strconv.ParseFloat(locationResponse.Lat, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid latitude: %w", err)
+	}
+	lng, err := strconv.ParseFloat(locationResponse.Lon, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid longitude: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

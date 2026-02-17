@@ -139,9 +139,17 @@ func (r *TurfService) UpdateTurf(id string, req types.UpdateTurfRequest) (*model
 	if req.Address != nil {
 		turf.Address = *req.Address
 		// update lat/lng when address changes
-		lat, lng, gerr := helpers.GeocodeAddress(turf.Address)
+		locationResponse, gerr := helpers.GeocodeAddress(turf.Address)
 		if gerr != nil {
 			return nil, fmt.Errorf("geocoding address: %w", gerr)
+		}
+		lat, err := strconv.ParseFloat(locationResponse.Lat, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid latitude: %w", err)
+		}
+		lng, err := strconv.ParseFloat(locationResponse.Lon, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid longitude: %w", err)
 		}
 		turf.Latitude = lat
 		turf.Longitude = lng

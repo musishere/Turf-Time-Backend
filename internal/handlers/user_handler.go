@@ -163,6 +163,7 @@ func (h *UserHandler) VerifyEmailOtp(c *gin.Context) {
 	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, gin.H{
 		"user":    SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+		"token":   token,
 		"message": "Email verified. Account is now active.",
 	})
 }
@@ -230,11 +231,23 @@ func (h *UserHandler) LogOutUser(c *gin.Context) {
 	})
 }
 
-func (h *UserHandler) GetCurrentUser(c *gin.Context) {
+// getTokenFromRequest returns JWT from cookie (web) or Authorization header (mobile).
+func getTokenFromRequest(c *gin.Context) (string, bool) {
+	if tok, err := c.Cookie("Jwt-Token"); err == nil && tok != "" {
+		return tok, true
+	}
+	auth := c.GetHeader("Authorization")
+	const prefix = "Bearer "
+	if len(auth) >= len(prefix) && auth[:len(prefix)] == prefix {
+		return auth[len(prefix):], true
+	}
+	return "", false
+}
 
-	tokernString, err := c.Cookie("Jwt-Token")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, "No Token recieved")
+func (h *UserHandler) GetCurrentUser(c *gin.Context) {
+	tokernString, ok := getTokenFromRequest(c)
+	if !ok || tokernString == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No token received"})
 		return
 	}
 

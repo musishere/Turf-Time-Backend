@@ -13,5 +13,5 @@ func SetupUserRoutes(api *gin.RouterGroup, userService *services.UserService) {
 	api.POST("/login", handlers.NewUserHandler(userService).LoginUser)
 	api.GET("/get-currentUser", handlers.NewUserHandler(userService).GetCurrentUser)
 	api.POST("/logout", handlers.NewUserHandler(userService).LogOutUser)
-	api.POST("/oauth-facebook", handlers.NewUserHandler(userService).SignUpOauth2Facebook)
+	// api.POST("/oauth-facebook", handlers.NewUserHandler(userService).SignUpOauth2Facebook)
 }

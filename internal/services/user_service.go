@@ -141,6 +141,32 @@ func (s *UserService) ActivateUserByPhone(req types.ActivateUserRequest) (*model
 	return user, token, nil
 }
 
+// ActivateUserByEmail sets user is_active to true after OTP was verified via email (call helpers.VerifyOTP first).
+func (s *UserService) ActivateUserByEmail(email string) (*models.User, string, error) {
+	user, err := s.userRepo.GetUserByEmail(email)
+	if err != nil {
+		return nil, "", errors.New("user not found for this email")
+	}
+
+	user.IsActive = true
+	user.UpdatedAt = time.Now()
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return nil, "", err
+	}
+
+	location, _ := s.locationRepo.GetLocationByUserID(user.ID.String())
+	if location != nil {
+		user.Location = *location
+	}
+
+	token, err := auth.GenerateJWT(user.ID, user.Email, user.Name, s.jwtSecret)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return user, token, nil
+}
+
 func (s *UserService) Login(req types.LoginRequest) (*models.User, string, error) {
 	user, err := s.userRepo.GetUserByEmail(req.Email)
 	if err != nil {

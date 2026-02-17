@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -78,13 +79,96 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// OTP flow disabled for testing - set cookie and return token
+	// Generate OTP
+	otp := helpers.GenerateOTP()
+	otpStr := fmt.Sprintf("%d", otp)
+
+	// Store OTP temporarily (using email as identifier for email verification)
+	if err := helpers.StoreOTP(req.Email, otpStr); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store OTP"})
+		return
+	}
+
+	// Send OTP via email
+	if err := helpers.SendEmail(req.Email, otpStr); err != nil {
+		// Log the actual error for debugging
+		fmt.Println("Email send error:", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "failed to send OTP email",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Set cookie and return response instructing user to verify
 	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
 	c.JSON(http.StatusCreated, gin.H{
-		"user": SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+		"user":    SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+		"message": "Registration successful. OTP has been sent to your email. Please verify to activate your account.",
 	})
 }
 
+func (h *UserHandler) VerifyEmailOtp(c *gin.Context) {
+	// Accept OTP as either number or string in JSON payload.
+	var payload map[string]interface{}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email and otp are required", "details": err.Error()})
+		return
+	}
+
+	// extract email
+	e, ok := payload["email"]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		return
+	}
+	email, ok := e.(string)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email must be a string"})
+		return
+	}
+
+	// extract otp (may be number or string)
+	o, ok := payload["otp"]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "otp is required"})
+		return
+	}
+	var otpStr string
+	switch v := o.(type) {
+	case string:
+		otpStr = v
+	case float64:
+		otpStr = fmt.Sprintf("%.0f", v)
+	default:
+		otpStr = fmt.Sprintf("%v", v)
+	}
+
+	ok, err := helpers.VerifyOTP(email, otpStr)
+	if err != nil || !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired OTP"})
+		return
+	}
+
+	user, token, err := h.userService.ActivateUserByEmail(email)
+	if err != nil {
+		statusCode := http.StatusBadRequest
+		if err.Error() == "user not found for this email" {
+			statusCode = http.StatusNotFound
+		}
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("Jwt-Token", token, 3600, "/", "localhost", false, true)
+	c.JSON(http.StatusOK, gin.H{
+		"user":    SignupUserResponse{Name: user.Name, Email: user.Email, Role: user.Role, IsActive: user.IsActive, Gender: user.Gender, Phone: user.Phone},
+		"message": "Email verified. Account is now active.",
+	})
+}
+
+// Phone OTP verification is commented out for now
+/*
 func (h *UserHandler) VerifyOtp(c *gin.Context) {
 	var req types.VerifyOtpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,6 +198,7 @@ func (h *UserHandler) VerifyOtp(c *gin.Context) {
 		"message": "Phone verified. Account is now active.",
 	})
 }
+*/
 
 func (h *UserHandler) LoginUser(c *gin.Context) {
 
